@@ -10,6 +10,9 @@
 namespace Amplifr\Networks;
 
 
+use Amplifr\Stat\CounterInterface;
+use Amplifr\Stat\Counter;
+
 /**
  * Class Network
  * @package Amplifr\Networks
@@ -52,39 +55,9 @@ class Network implements NetworkInterface
     protected $subscribersDiffCount;
 
     /**
-     * @var int | null
+     * @var CounterInterface
      */
-    protected $likesCount;
-
-    /**
-     * @var int | null
-     */
-    protected $commentsCount;
-
-    /**
-     * @var int | null
-     */
-    protected $sharesCount;
-
-    /**
-     * @var int | null
-     */
-    protected $linkClicksCount;
-
-    /**
-     * @var int | null
-     */
-    protected $uniqueViewsCount;
-
-    /**
-     * @var int | null
-     */
-    protected $fanUniqueViewsCount;
-
-    /**
-     * @var int | null
-     */
-    protected $totalViewsCount;
+    protected $statistics;
 
     /**
      * @return string
@@ -183,121 +156,24 @@ class Network implements NetworkInterface
     }
 
     /**
-     * @return int|null
+     * @return CounterInterface
      */
-    public function getLikesCount()
+    public function getStatistics()
     {
-        return $this->likesCount;
+        return $this->statistics;
     }
 
     /**
-     * @param int|null $likesCount
+     * @param CounterInterface $obStatistics
      */
-    protected function setLikesCount($likesCount)
+    protected function setStatistics(CounterInterface $obStatistics)
     {
-        $this->likesCount = $likesCount;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getCommentsCount()
-    {
-        return $this->commentsCount;
-    }
-
-    /**
-     * @param int|null $commentsCount
-     */
-    protected function setCommentsCount($commentsCount)
-    {
-        $this->commentsCount = $commentsCount;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getSharesCount()
-    {
-        return $this->sharesCount;
-    }
-
-    /**
-     * @param int|null $sharesCount
-     */
-    protected function setSharesCount($sharesCount)
-    {
-        $this->sharesCount = $sharesCount;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getLinkClicksCount()
-    {
-        return $this->linkClicksCount;
-    }
-
-    /**
-     * @param int|null $linkClicksCount
-     */
-    protected function setLinkClicksCount($linkClicksCount)
-    {
-        $this->linkClicksCount = $linkClicksCount;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getUniqueViewsCount()
-    {
-        return $this->uniqueViewsCount;
-    }
-
-    /**
-     * @param int|null $uniqueViewsCount
-     */
-    protected function setUniqueViewsCount($uniqueViewsCount)
-    {
-        $this->uniqueViewsCount = $uniqueViewsCount;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getFanUniqueViewsCount()
-    {
-        return $this->fanUniqueViewsCount;
-    }
-
-    /**
-     * @param int|null $fanUniqueViewsCount
-     */
-    protected function setFanUniqueViewsCount($fanUniqueViewsCount)
-    {
-        $this->fanUniqueViewsCount = $fanUniqueViewsCount;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getTotalViewsCount()
-    {
-        return $this->totalViewsCount;
-    }
-
-    /**
-     * @param int|null $totalViewsCount
-     */
-    protected function setTotalViewsCount($totalViewsCount)
-    {
-        $this->totalViewsCount = $totalViewsCount;
+        $this->statistics = $obStatistics;
     }
 
     /**
      * Network constructor.
      * @param $arNetworkAccount
-     * @todo перейти на счётчики
      */
     public function __construct($arNetworkAccount)
     {
@@ -306,14 +182,9 @@ class Network implements NetworkInterface
         $this->setCode($arNetworkAccount['network']);
         $this->setUserName($arNetworkAccount['name']);
         $this->setUrl($arNetworkAccount['url']);
-        $this->setSubscribersCount($arNetworkAccount['subscribers']);
-        $this->setSubscribersDiffCount($arNetworkAccount['subscribersDiff']);
-        $this->setLikesCount($arNetworkAccount['stats']['likes']);
-        $this->setSharesCount($arNetworkAccount['stats']['shares']);
-        $this->setCommentsCount($arNetworkAccount['stats']['comments']);
-        $this->setLinkClicksCount($arNetworkAccount['stats']['linkClicks']);
-        $this->setUniqueViewsCount($arNetworkAccount['stats']['uniqueViews']);
-        $this->setFanUniqueViewsCount($arNetworkAccount['stats']['fanUniqueViews']);
-        $this->setTotalViewsCount($arNetworkAccount['stats']['totalViews']);
+        $this->setSubscribersCount((int)$arNetworkAccount['subscribers']);
+        $this->setSubscribersDiffCount((int)$arNetworkAccount['subscribersDiff']);
+        $obStat = new Counter($arNetworkAccount['stats']);
+        $this->setStatistics($obStat);
     }
 }

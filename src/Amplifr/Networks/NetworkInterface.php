@@ -10,6 +10,8 @@
 namespace Amplifr\Networks;
 
 
+use Amplifr\Stat\CounterInterface;
+
 /**
  * Interface NetworkInterface
  * @package Amplifr\Networks
@@ -44,40 +46,10 @@ interface NetworkInterface
     /**
      * @return int
      */
-    public function getLikesCount();
-
-    /**
-     * @return int
-     */
-    public function getSharesCount();
-
-    /**
-     * @return int
-     */
-    public function getCommentsCount();
-
-    /**
-     * @return int
-     */
-    public function getLinkClicksCount();
-
-    /**
-     * @return int
-     */
     public function getSubscribersDiffCount();
 
     /**
-     * @return int|null
+     * @return CounterInterface
      */
-    public function getUniqueViewsCount();
-
-    /**
-     * @return int|null
-     */
-    public function getFanUniqueViewsCount();
-
-    /**
-     * @return int|null
-     */
-    public function getTotalViewsCount();
+    public function getStatistics();
 }

@@ -46,6 +46,20 @@ class StatPost implements StatPostInterface
     protected $statistics;
 
     /**
+     * Post constructor.
+     * @param $arPostItem
+     */
+    public function __construct($arPostItem)
+    {
+        $this->arPost = $arPostItem;
+        $this->setId($arPostItem['id']);
+        $this->setUserName($arPostItem['name']);
+        $this->setUrl($arPostItem['url']);
+        $this->setNetworkCode($arPostItem['network']);
+        $this->setStatistics(new Counter($arPostItem['stats']));
+    }
+
+    /**
      * @return int
      */
     public function getId()
@@ -118,24 +132,10 @@ class StatPost implements StatPostInterface
     }
 
     /**
-     * @param CounterInterface $arStatistics
+     * @param CounterInterface $obStatistics
      */
-    protected function setStatistics($arStatistics)
+    protected function setStatistics(CounterInterface $obStatistics)
     {
-        $this->statistics = new Counter($arStatistics);
-    }
-
-    /**
-     * Post constructor.
-     * @param $arPostItem
-     */
-    public function __construct($arPostItem)
-    {
-        $this->arPost = $arPostItem;
-        $this->setId($arPostItem['id']);
-        $this->setUserName($arPostItem['name']);
-        $this->setUrl($arPostItem['url']);
-        $this->setNetworkCode($arPostItem['network']);
-        $this->setStatistics($arPostItem['stats']);
+        $this->statistics = $obStatistics;
     }
 }

@@ -52,7 +52,7 @@ interface AmplifrInterface
     /**
      * @param int $projectId
      * @param int $amplifrPublicationId
-     * @return StatPublicationInterface | null
+     * @return \SplObjectStorage
      * @throws AmplifrException
      */
     public function getStatByPublicationId($projectId, $amplifrPublicationId);
@@ -61,7 +61,7 @@ interface AmplifrInterface
      * @param int $projectId
      * @param string $publicationUrl
      * @throws AmplifrException
-     * @return StatPublicationInterface | null
+     * @return  \SplObjectStorage
      */
     public function getStatByPublicationUrl($projectId, $publicationUrl);
 }

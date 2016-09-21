@@ -57,24 +57,29 @@ class StatPublication implements StatPublicationInterface
         $this->setPublicationId($arPublicationStatItem['id']);
         $this->setPreface($arPublicationStatItem['preface']);
         $this->setUrl($arPublicationStatItem['pubs'][-1]['url']);
-        $this->setTotalStatistics($arPublicationStatItem['pubs'][-1]['stats']);
-        $this->setStatPosts($arPublicationStatItem['pubs']);
-    }
 
-    /**
-     * @param $arPostItems array
-     * @todo перенести в конструктор
-     */
-    protected function setStatPosts($arPostItems)
-    {
-        $this->statPosts = new \SplObjectStorage();
-        foreach ($arPostItems as $amplifrPostId => $arPostItem) {
+        // total stat
+        $obTotalStatCounter = new Counter($arPublicationStatItem['pubs'][-1]['stats']);
+        $this->setTotalStatistics($obTotalStatCounter);
+
+        // stat per posts
+        $obStatPosts = new \SplObjectStorage();
+        foreach ($arPublicationStatItem['pubs'] as $amplifrPostId => $arPostItem) {
             if ('total' === $arPostItem['network']) {
                 continue;
             }
             $arPostItem['id'] = $amplifrPostId;
-            $this->statPosts->attach(new StatPost($arPostItem));
+            $obStatPosts->attach(new StatPost($arPostItem));
         }
+        $this->setStatPosts($obStatPosts);
+    }
+
+    /**
+     * @param \SplObjectStorage $obStatPosts
+     */
+    protected function setStatPosts(\SplObjectStorage $obStatPosts)
+    {
+        $this->statPosts = $obStatPosts;
     }
 
     /**
@@ -86,11 +91,11 @@ class StatPublication implements StatPublicationInterface
     }
 
     /**
-     * @param $arStatItem
+     * @param CounterInterface $obCounter
      */
-    protected function setTotalStatistics($arStatItem)
+    protected function setTotalStatistics(CounterInterface $obCounter)
     {
-        $this->totalStatistics = new Counter($arStatItem);
+        $this->totalStatistics = $obCounter;
     }
 
     /**

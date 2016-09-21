@@ -264,31 +264,63 @@ class Amplifr implements AmplifrInterface
     /**
      * @param $projectId
      * @param $amplifrPublicationId
-     * @return StatPublication | null
+     * @return \SplObjectStorage
      * @throws AmplifrException
      */
     public function getStatByPublicationId($projectId, $amplifrPublicationId)
     {
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/stats/%d', $projectId, $amplifrPublicationId), 'GET',
             array());
-        $arResult['result']['stats']['id'] = $amplifrPublicationId;
-        return new StatPublication($arResult['result']['stats']);
+
+        $obStorage = new \SplObjectStorage();
+
+        if (is_array($arResult['result'])) {
+            $arResult['result']['stats']['id'] = $amplifrPublicationId;
+            $obStorage->attach(new StatPublication($arResult['result']['stats']));
+        }
+
+        if ('not found' === $arResult['result']) {
+            $this->log->warning(sprintf('publication with id [%d] for project [%d] not found, stat report not created',
+                $amplifrPublicationId, $projectId));
+        }
+
+        return $obStorage;
     }
 
     /**
      * @param $projectId
      * @param $publicationUrl
      * @throws AmplifrException
-     * @return StatPublication | null
+     * @return \SplObjectStorage
      */
     public function getStatByPublicationUrl($projectId, $publicationUrl)
     {
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/stats/by_link', $projectId), 'GET', array(
             'link' => $publicationUrl
         ));
-        $arPublicationId = array_keys($arResult['result']['stats']['pubs']);
-        $arResult['result']['stats']['pubs'][$arPublicationId[0]]['id'] = $arPublicationId[0];
-        return new StatPublication($arResult['result']['stats']);
+
+        $obStorage = new \SplObjectStorage();
+        if (is_array($arResult['result'])) {
+            // in result data structure we can't find publication id, but we have publication URL
+            $arResult['result']['stats']['id'] = $this->getPublicationIdFromAmplifrPublicationUrl($arResult['result']['stats']['pubs'][-1]['url']);
+            $obStorage->attach(new StatPublication($arResult['result']['stats']));
+        }
+
+        if ('not found' === $arResult['result']) {
+            $this->log->warning(sprintf('publication with url [%s] for project [%d] not found, stat report not created',
+                $publicationUrl, $projectId));
+        }
+
+        return $obStorage;
+    }
+
+    /**
+     * @param $publicationUrl
+     * @return int
+     */
+    private function getPublicationIdFromAmplifrPublicationUrl($publicationUrl)
+    {
+        return (int)substr($publicationUrl, strrpos($publicationUrl, ':') + 1);
     }
 
     /**

@@ -17,42 +17,42 @@ namespace Amplifr\Stat;
 class Counter implements CounterInterface
 {
     /**
-     * @var int | null
+     * @var int
      */
     protected $likes;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $shares;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $comments;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $linkClicks;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $videoPlays;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $uniqueViews;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $fanUniqueViews;
 
     /**
-     * @var int | null
+     * @var int
      */
     protected $totalViews;
 
@@ -190,13 +190,13 @@ class Counter implements CounterInterface
      */
     public function __construct($arItem)
     {
-        $this->setLikes($arItem['likes']);
-        $this->setShares($arItem['shares']);
-        $this->setComments($arItem['comments']);
-        $this->setLinkClicks($arItem['linkClicks']);
-        $this->setVideoPlays($arItem['videoPlays']);
-        $this->setUniqueViews($arItem['uniqueViews']);
-        $this->setFanUniqueViews($arItem['fanUniqueViews']);
-        $this->setTotalViews($arItem['totalViews']);
+        $this->setLikes((int)$arItem['likes']);
+        $this->setShares((int)$arItem['shares']);
+        $this->setComments((int)$arItem['comments']);
+        $this->setLinkClicks((int)$arItem['linkClicks']);
+        $this->setVideoPlays((int)$arItem['videoPlays']);
+        $this->setUniqueViews((int)$arItem['uniqueViews']);
+        $this->setFanUniqueViews((int)$arItem['fanUniqueViews']);
+        $this->setTotalViews((int)$arItem['totalViews']);
     }
 }

@@ -33,13 +33,11 @@ interface StatReportInterface
 
     /**
      * @return mixed
-     * @todo migrate to objects
      */
     public function getBestPublications();
 
     /**
      * @return mixed
-     * @todo migrate to objects
      */
     public function getInteractions();
 }

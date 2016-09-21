@@ -38,6 +38,25 @@ class StatReport implements StatReportInterface
      */
     protected $networks;
 
+
+    /**
+     * StatReport constructor.
+     * @param $arStatReport
+     */
+    public function __construct($arStatReport)
+    {
+        $this->arStatReport = $arStatReport;
+        $this->setDateFrom(new \DateTime($arStatReport['from']));
+        $this->setDateTo(new \DateTime($arStatReport['to']));
+
+        $networkObjects = new \SplObjectStorage();
+        foreach ($arStatReport['networks'] as $networkId => $arItemNetwork) {
+            $arItemNetwork['id'] = $networkId;
+            $networkObjects->attach(new Network($arItemNetwork));
+        }
+        $this->setNetworks($networkObjects);
+    }
+    
     /**
      * @return \DateTime
      */
@@ -88,7 +107,6 @@ class StatReport implements StatReportInterface
 
     /**
      * @return mixed
-     * @todo migrate to objects
      */
     public function getBestPublications()
     {
@@ -97,28 +115,9 @@ class StatReport implements StatReportInterface
 
     /**
      * @return mixed
-     * @todo migrate to objects
      */
     public function getInteractions()
     {
         return $this->arStatReport['interactions'];
-    }
-
-    /**
-     * StatReport constructor.
-     * @param $arStatReport
-     */
-    public function __construct($arStatReport)
-    {
-        $this->arStatReport = $arStatReport;
-        $this->setDateFrom(new \DateTime($arStatReport['from']));
-        $this->setDateTo(new \DateTime($arStatReport['to']));
-
-        $networkObjects = new \SplObjectStorage();
-        foreach ($arStatReport['networks'] as $networkId => $arItemNetwork) {
-            $arItemNetwork['id'] = $networkId;
-            $networkObjects->attach(new Network($arItemNetwork));
-        }
-        $this->setNetworks($networkObjects);
     }
 }
