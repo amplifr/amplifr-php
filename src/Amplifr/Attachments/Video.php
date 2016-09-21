@@ -1,4 +1,5 @@
 <?php
+
 /*
  * This file is part of the Amplifr package.
  *
@@ -10,16 +11,16 @@ namespace Amplifr\Attachments;
 
 
 /**
- * Class Image
+ * Class Video
  * @package Amplifr\Attachments
  */
-class Image extends Attachment
+class Video extends Attachment
 {
     /**
      * @return string
      */
     public function getType()
     {
-        return 'image';
+        return 'video';
     }
 }

@@ -10,8 +10,10 @@
 namespace Amplifr;
 
 
+use Amplifr\Attachments\Video;
 use Amplifr\Exceptions\AmplifrException;
 use Amplifr\Exceptions\IoAmplifrException;
+use Amplifr\Exceptions\ApiAmplifrException;
 use Amplifr\Accounts\Account;
 use Amplifr\Attachments\Image;
 use Amplifr\Attachments\AttachmentInterface;
@@ -41,12 +43,12 @@ class Amplifr implements AmplifrInterface
     /**
      * @var string SDK version
      */
-    const API_VERSION = '1.0.0';
+    const SDK_VERSION = '1.0.0';
 
     /**
      * @var string user agent
      */
-    const API_USER_AGENT = 'amplifr-php-sdk';
+    const API_USER_AGENT = 'amplifr-php';
 
     /**
      * @var string
@@ -105,7 +107,7 @@ class Amplifr implements AmplifrInterface
             CURLOPT_RETURNTRANSFER => true,
             CURLINFO_HEADER_OUT => true,
             CURLOPT_VERBOSE => true,
-            CURLOPT_USERAGENT => strtolower(self::API_USER_AGENT . '-v' . self::API_VERSION),
+            CURLOPT_USERAGENT => strtolower(self::API_USER_AGENT . '-v' . self::SDK_VERSION),
         ));
 
         if ($obLogger !== null) {
@@ -349,8 +351,8 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
-     * @param $imageId
+     * @param int $projectId
+     * @param int $imageId
      * @throws AmplifrException
      * @return AttachmentInterface
      */
@@ -359,6 +361,22 @@ class Amplifr implements AmplifrInterface
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/images/%d', $projectId, $imageId), 'GET');
         return new Image($imageId, $arResult['result']['url']);
+    }
+
+    /**
+     * @param int $projectId
+     * @param string $videoFileName
+     * @return array
+     * @throws AmplifrException
+     */
+    public function getVideoUploadUrl($projectId, $videoFileName)
+    {
+        $arResult = $this->executeApiRequest(sprintf('/projects/%d/videos/get_upload_url?%s',
+            $projectId, http_build_query(array(
+                'filename' => $videoFileName
+            ))), 'GET');
+
+        return $arResult['result'];
     }
 
     /**
@@ -378,48 +396,164 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
-     * @param $imageFilename
-     * @throws AmplifrException
+     * @param string $localFilename
+     * @param string $uploadUrl
+     * @throws IoAmplifrException
      */
-    public function uploadImage($projectId, $imageFilename)
+    protected function uploadFileToStorage($localFilename, $uploadUrl)
     {
-        if (!file_exists($imageFilename)) {
-            $errorMessage = sprintf('file [%s] not found', $imageFilename);
+        if (!is_file($localFilename)) {
+            $errorMessage = sprintf('resource [%s] is not a file', $localFilename);
             $this->log->error($errorMessage, array(
-                'project_id' => $projectId,
-                'image_filename' => $imageFilename
+                'filename' => $localFilename
             ));
-            throw new AmplifrException($errorMessage);
+            throw new IoAmplifrException($errorMessage);
         }
 
-        // get image upload url in amplifr
-        $arUploadFileInfo = $this->getImageUploadUrl($projectId, basename($imageFilename));
-        $this->log->debug('get upload file info from Amplifr', array($arUploadFileInfo));
+        if (!is_readable($localFilename)) {
+            $errorMessage = sprintf('file [%s] is not readable', $localFilename);
+            $this->log->error($errorMessage, array(
+                'filename' => $localFilename
+            ));
+            throw new IoAmplifrException($errorMessage);
+        }
 
+        $fileSize = filesize($localFilename);
+        if (false === $fileSize) {
+            $errorMessage = sprintf('file size calculate error for file [%s] ', $localFilename);
+            $this->log->error($errorMessage, array(
+                'filename' => $localFilename
+            ));
+            throw new IoAmplifrException($errorMessage);
+        }
+
+        $fileHandler = fopen($localFilename, 'r');
+        if (false === $fileHandler) {
+            $errorMessage = sprintf('open file error for [%s]', $localFilename);
+            $this->log->error($errorMessage, array(
+                'filename' => $localFilename
+            ));
+            throw new IoAmplifrException($errorMessage);
+        }
+
+        $this->log->debug('try to upload file to amplifr backend', array(
+            'name' => $localFilename,
+            'size' => $fileSize
+        ));
         // send file to Amplifr backend
-        $curlResult = $this->curlWrapper(
+        $backendImageStorageResult = $this->curlWrapper(
             array(
-                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 60,
                 CURLOPT_TIMEOUT => 60,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => array(
-                    'file' => $this->getCurlFileValue($imageFilename, mime_content_type($imageFilename),
-                        basename($imageFilename))
+                CURLOPT_CUSTOMREQUEST => 'PUT',
+                CURLOPT_INFILE => $fileHandler,
+                CURLOPT_INFILESIZE => $fileSize,
+                CURLOPT_UPLOAD => true,
+                CURLOPT_HTTPHEADER => array(
+                    'Content-type: ' . mime_content_type($localFilename),
+                    'Content-length: ' . $fileSize
                 ),
-                CURLOPT_URL => $arUploadFileInfo['presignedUrl']
+                CURLOPT_URL => $uploadUrl
             )
         );
-//        var_dump($curlResult);
-//        $this->sendFile('https://mesilov.b24.io/dev/amplifr/test.php', $imageFilename);
+        fclose($fileHandler);
 
-        //
-//        var_dump($arUploadFileInfo);
+        $this->handleNetworkErrors();
+        if ($backendImageStorageResult !== '') {
+            $errorMessage = sprintf('upload error for file [%s]', $localFilename);
+            $this->log->error($errorMessage, array(
+                'filename' => $localFilename,
+                'upload_url' => $uploadUrl,
+                'backend_response' => $backendImageStorageResult
+            ));
+            throw new IoAmplifrException($errorMessage);
+        }
+    }
 
-        //
+    /**
+     * upload local video to amplifr backend
+     *
+     * @param int $projectId
+     * @param string $localFilename
+     *
+     * @throws AmplifrException
+     *
+     * @return AttachmentInterface
+     */
+    public function uploadLocalVideo($projectId, $localFilename)
+    {
+        // get image upload url in amplifr
+        $arUploadFileInfo = $this->getVideoUploadUrl($projectId, basename($localFilename));
+        $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
 
-        // commit image id
-        // return Image object
+        // upload file to S3 backend
+        $this->uploadFileToStorage($localFilename, $arUploadFileInfo['presignedUrl']);
+
+        return new Video($arUploadFileInfo['id'], $arUploadFileInfo['publicUrl']);
+    }
+
+    /**
+     * upload local image to amplifr backend
+     *
+     * @param int $projectId
+     * @param string $localFilename
+     *
+     * @throws AmplifrException
+     *
+     * @return AttachmentInterface
+     */
+    public function uploadLocalImage($projectId, $localFilename)
+    {
+        // get image upload url in amplifr
+        $arUploadFileInfo = $this->getImageUploadUrl($projectId, basename($localFilename));
+        $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
+
+        // upload file to S3 backend
+        $this->uploadFileToStorage($localFilename, $arUploadFileInfo['presignedUrl']);
+
+        // confirm success file upload to backend
+        $arResult = $this->executeApiRequest(
+            sprintf('/projects/%d/images/%d/commit', $projectId, $arUploadFileInfo['id']), 'POST');
+
+        if ($arResult['result']['status'] !== 'uploaded') {
+            $errorMessage = sprintf('upload error for file [%s]', $localFilename);
+            $this->log->error($errorMessage, array(
+                'upload_file_info' => $arUploadFileInfo,
+                'backend_response' => $arResult
+            ));
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        return new Image($arUploadFileInfo['id'], $arUploadFileInfo['publicUrl']);
+    }
+
+    /**
+     * upload image by url
+     *
+     * @param int $projectId
+     * @param string $imageUrl
+     *
+     * @throws AmplifrException
+     *
+     * @return AttachmentInterface
+     */
+    public function uploadImageByUrl($projectId, $imageUrl)
+    {
+        $arResult = $this->executeApiRequest(
+            sprintf('/projects/%d/images/upload_from_url', $projectId), 'POST', array(
+            'url' => $imageUrl
+        ));
+
+        if ($arResult['result']['status'] !== 'uploaded') {
+            $errorMessage = sprintf('image upload by URL error [%s]', $imageUrl);
+            $this->log->error($errorMessage, array(
+                'project_id' => $projectId,
+                'image_url' => $imageUrl,
+                'backend_response' => $arResult
+            ));
+            throw new ApiAmplifrException($errorMessage);
+        }
+        return $this->getImage((int)$projectId, (int)$arResult['result']['id']);
     }
 
     /**
@@ -451,17 +585,55 @@ class Amplifr implements AmplifrInterface
                 CURLOPT_URL => self::API_ENDPOINT . $url
             )
         );
+        $this->handleNetworkErrors();
+        $arResult = $this->decodeApiJsonResponse($curlResult);
+        $this->handleApiErrors($arResult);
+        return $arResult;
+    }
 
+    /**
+     * @param array $arApiResponse
+     * @throws ApiAmplifrException
+     */
+    protected function handleApiErrors(array $arApiResponse)
+    {
+        if (!array_key_exists('ok', $arApiResponse)) {
+            $errorMsg = sprintf('api error [%s] with code [%d]', $arApiResponse['status'], $arApiResponse['code']);
+            $this->log->error($errorMsg, $this->getContext());
+            throw new ApiAmplifrException($errorMsg);
+        }
+    }
+
+    /**
+     * @throws IoAmplifrException
+     */
+    protected function handleNetworkErrors()
+    {
+        $arRequestInfo = $this->getRequestInfo();
+        // handling network level resource errors
+        if (!in_array($arRequestInfo['http_code'], range(200, 204), true)) {
+            $errorMsg = sprintf('network error, http code: %d', $arRequestInfo['http_code']);
+            $this->log->error($errorMsg, $this->getContext());
+            throw new IoAmplifrException($errorMsg);
+        }
+    }
+
+    /**
+     * @param $jsonApiResponse
+     * @return mixed
+     * @throws AmplifrException
+     */
+    protected function decodeApiJsonResponse($jsonApiResponse)
+    {
         // handling server-side API errors: empty response
-        if ($curlResult === '') {
-            $errorMsg = sprintf('empty response');
+        if ($jsonApiResponse === '') {
+            $errorMsg = sprintf('empty response from server');
             $this->log->error($errorMsg, $this->getContext());
             throw new AmplifrException($errorMsg);
         }
 
         // handling json_decode errors
-        $jsonResult = json_decode($curlResult, true);
-        unset($curlResult);
+        $jsonResult = json_decode($jsonApiResponse, true);
         $jsonErrorCode = json_last_error();
         if (null === $jsonResult && (JSON_ERROR_NONE !== $jsonErrorCode)) {
             /**
@@ -475,32 +647,6 @@ class Amplifr implements AmplifrInterface
     }
 
     // cURL helper methods
-
-    /**
-     * helper function for create \CURLFile object
-     * @see https://github.com/guzzle/guzzle/blob/3a0787217e6c0246b457e637ddd33332efea1d2a/src/Guzzle/Http/Message/PostFile.php#L90
-     * @param $filename string
-     * @param $contentType string
-     * @param $postFilename string
-     * @return \CURLFile|string
-     */
-    protected function getCurlFileValue($filename, $contentType, $postFilename)
-    {
-        // PHP 5.5 introduced a CurlFile object that deprecates the old @filename syntax
-        // See: https://wiki.php.net/rfc/curl-file-upload
-        if (function_exists('curl_file_create')) {
-            return curl_file_create($filename, $contentType, $postFilename);
-        }
-
-        // Use the old style if using an older version of PHP
-        $value = "@{$filename};filename=" . $postFilename;
-        if ($contentType) {
-            $value .= ';type=' . $contentType;
-        }
-
-        return $value;
-    }
-
     /**
      * Set custom cURL options, overriding default ones
      * @link http://php.net/manual/en/function.curl-setopt.php
@@ -582,14 +728,6 @@ class Amplifr implements AmplifrInterface
             $this->log->error($errorMsg, $this->getContext());
             throw new IoAmplifrException($errorMsg);
         }
-
-        // handling network level resource errors
-        if (!in_array($this->requestInfo['http_code'], range(200, 204), true)) {
-            $errorMsg = sprintf('http code: %d', $this->requestInfo['http_code']);
-            $this->log->error($errorMsg, $this->getContext());
-            throw new IoAmplifrException($errorMsg);
-        }
-
         return $curlResult;
     }
 }

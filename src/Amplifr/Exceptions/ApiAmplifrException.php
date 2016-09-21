@@ -11,15 +11,9 @@ namespace Amplifr\Exceptions;
 
 
 /**
- * Class AmplifrException
- *
- * \Exception
- *      AmplifrException — base class
- *          IoAmplifrException — I/O network errors
- *          ApiAmplifrException — API-level exceptions
- *
+ * Class ApiAmplifrException
  * @package Amplifr\Exceptions
  */
-class AmplifrException extends \Exception
+class ApiAmplifrException extends AmplifrException
 {
 }
