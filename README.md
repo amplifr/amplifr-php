@@ -75,6 +75,61 @@ print(sprintf('is click counting: %s' . PHP_EOL, print_r($postItem->isClickCount
 print(sprintf('subforms: %s' . PHP_EOL, print_r($postItem->getSubforms(), true)));
 ?>
 ``` 
+
+### Publish new post to Amplifr with personal text per social network account
+```php
+<?php
+// prepare draft post
+$accountId = 60867;
+$secondAccountId = 59456;
+
+$imgFilename = __DIR__ . '/img.jpg';
+
+/**
+ * @var $obAttach \Amplifr\Attachments\AttachmentInterface
+ */
+$obAttach = $obAmplifr->uploadLocalImage($projectId, $imgFilename);
+/**
+ * @var $obDraft \Amplifr\Posts\DraftInterface
+ */
+$obDraft = new \Amplifr\Posts\Draft('Hello world! #' . mt_rand(), 'https://amplifr.com', new DateTime());
+$obDraft->addAttachment($obAttach);
+$obDraft->setSocialNetworkAccounts($obAmplifr->getAccountById($projectId, $accountId));
+
+
+// for another social network account we build different card with other text
+/**
+ * @var $obDraft2 \Amplifr\Posts\DraftInterface
+ */
+$obDraft2 = new \Amplifr\Posts\Draft('Hello world for another social network account and this a very long text!!1111111111 #' . mt_rand(), 'https://amplifr.com', new DateTime());
+$obDraft2->addAttachment($obAttach);
+$obDraft2->setSocialNetworkAccounts($obAmplifr->getAccountById($projectId, $secondAccountId));
+// bind draft2 to general draft
+$obDraft->addSubform($obDraft2);
+/**
+ *@var $postStorage \SplObjectStorage
+ */
+$postStorage = $obAmplifr->addNewPost($projectId, $obDraft);
+/**
+ * @var \Amplifr\Posts\PostInterface
+ */
+$postItem = $postStorage->current();
+print(sprintf('id: %s' . PHP_EOL, $postItem->getId()));
+print(sprintf('url: %s' . PHP_EOL, print_r($postItem->getUrl(), true)));
+print(sprintf('post time: %s' . PHP_EOL, $postItem->getTime()->format(DATE_ISO8601)));
+print(sprintf('text: %s' . PHP_EOL, $postItem->getText()));
+print(sprintf('author_id: %s' . PHP_EOL, $postItem->getAuthorId()));
+print(sprintf('errors: %s' . PHP_EOL, print_r($postItem->getErrors(), true)));
+print(sprintf('states: %s' . PHP_EOL, print_r($postItem->getStates(), true)));
+print(sprintf('social networks: %s' . PHP_EOL, print_r($postItem->getSocialNetworks(), true)));
+print(sprintf('publications: %s' . PHP_EOL, print_r($postItem->getPublications(), true)));
+print(sprintf('attachments: %s' . PHP_EOL, print_r($postItem->getAttachmentsId(), true)));
+print(sprintf('previews: %s' . PHP_EOL, print_r($postItem->getPreviews(), true)));
+print(sprintf('counters: %s' . PHP_EOL, print_r($postItem->getStatistics(), true)));
+print(sprintf('is click counting: %s' . PHP_EOL, print_r($postItem->isClickCounting(), true)));
+print(sprintf('subforms: %s' . PHP_EOL, print_r($postItem->getSubforms(), true)));
+?>
+
 ### Work with Accounts
 ```php
 <?php
