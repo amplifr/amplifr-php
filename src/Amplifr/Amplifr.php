@@ -10,6 +10,7 @@
 namespace Amplifr;
 
 
+use Amplifr\Accounts\AccountInterface;
 use Amplifr\Attachments\Video;
 use Amplifr\Exceptions\AmplifrException;
 use Amplifr\Exceptions\IoAmplifrException;
@@ -21,6 +22,8 @@ use Amplifr\Posts\Post;
 use Amplifr\Posts\PostInterface;
 use Amplifr\Projects\Project;
 use Amplifr\Users\User;
+use Amplifr\Posts\DraftInterface;
+use Amplifr\Posts\Draft;
 
 use Amplifr\Stat\StatPublication;
 use Amplifr\Stat\StatReport;
@@ -216,6 +219,7 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
+     * get all accounts
      * @param $projectId
      * @return \SplObjectStorage of Accounts
      * @throws AmplifrException
@@ -228,6 +232,28 @@ class Amplifr implements AmplifrInterface
             $obCollection->attach(new Account($arItemAccount));
         }
         return $obCollection;
+    }
+
+    /**
+     * get account by amplifr id
+     * @param int $projectId
+     * @param int $accountId
+     * @return \SplObjectStorage of Accounts
+     * @throws AmplifrException
+     */
+    public function getAccountById($projectId, $accountId)
+    {
+        $allAccounts = $this->getAccounts($projectId);
+        $obResult = new \SplObjectStorage();
+        foreach ($allAccounts as $cnt => $itemAccount) {
+            /**
+             * @var AccountInterface $itemAccount
+             */
+            if ($itemAccount->getId() === (int)$accountId) {
+                $obResult->attach($itemAccount);
+            }
+        }
+        return $obResult;
     }
 
     /**
@@ -375,11 +401,21 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $arNewPost
-     * @todo fix
+     * add new post to Amplifr
+     * @param $projectId
+     * @param DraftInterface $obNewPost
+     * @throws AmplifrException
+     * @return \SplObjectStorage
      */
-    public function addNewPost($arNewPost)
+    public function addNewPost($projectId, DraftInterface $obNewPost)
     {
+        $arData = $obNewPost->getData();
+        $this->log->debug(sprintf('try to add new post'), array($arData));
+        $arResult = $this->executeApiRequest(sprintf('/projects/%d/posts', $projectId), 'POST', $arData);
+        $obResult = new \SplObjectStorage();
+        $obResult->attach(new Post($arResult['result']['post']));
+        $obResult->rewind();
+        return $obResult;
     }
 
     /**
