@@ -350,12 +350,16 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
+     * get post list
+     *
      * @param $projectId
      * @param int $pageNumber
      * @param int $postsPerPage
      * @param string $order
+     *
      * @throws AmplifrException
-     * @return Result
+     *
+     * @return PaginationInterface
      * @todo debug
      */
     public function getPostList($projectId, $pageNumber = 1, $postsPerPage = 25, $order = 'DESC')
@@ -365,21 +369,25 @@ class Amplifr implements AmplifrInterface
                 'page' => $pageNumber,
                 'per_page' => $postsPerPage,
 //                'today' => false,
-//                'order' => $order
+                'order' => $order
             ))), 'GET');
-
         $obCollection = new \SplObjectStorage();
         foreach ($arResult['result']['posts'] as $cnt => $arPostItem) {
             $obCollection->attach(new Post($arPostItem));
         }
-        return new Result($obCollection, $arResult['result']['pagination']['current_page'],
-            $arResult['result']['pagination']['total_pages']);
+
+        return new Pagination($obCollection, (int)$arResult['result']['pagination']['current_page'],
+            (int)$arResult['result']['pagination']['total_pages']);
     }
 
     /**
+     * get information about post
+     *
      * @param $projectId
      * @param $postId
+     *
      * @throws AmplifrException
+     *
      * @return PostInterface
      *
      * @todo fix bug https://github.com/amplifr/amplifr-php/issues/4
