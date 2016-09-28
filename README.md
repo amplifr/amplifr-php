@@ -34,6 +34,14 @@ amplifr-php is licensed under the MIT License - see the `MIT-LICENSE.txt` file f
 ?>
 ```
 
+### Delete post
+```php
+<?php
+$arResult = $obAmplifr->deletePost($projectId, 1005916);
+print(sprintf('delete post with id [%d], status [%s]' . PHP_EOL, $arResult['post_id'], $arResult['status']));
+?>
+```
+
 ### Publish new post to Amplifr to one social network account
 ```php
 <?php
@@ -129,6 +137,7 @@ print(sprintf('counters: %s' . PHP_EOL, print_r($postItem->getStatistics(), true
 print(sprintf('is click counting: %s' . PHP_EOL, print_r($postItem->isClickCounting(), true)));
 print(sprintf('subforms: %s' . PHP_EOL, print_r($postItem->getSubforms(), true)));
 ?>
+```
 
 ### Work with Accounts
 ```php

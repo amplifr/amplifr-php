@@ -382,7 +382,7 @@ class Amplifr implements AmplifrInterface
      * @throws AmplifrException
      * @return PostInterface
      *
-     * @todo debug
+     * @todo fix bug https://github.com/amplifr/amplifr-php/issues/4
      */
     public function getPost($projectId, $postId)
     {
@@ -392,12 +392,20 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
-     * @param $postId
-     * @todo fix
+     * delete post
+     *
+     * @param int $projectId
+     * @param int $postId
+     *
+     * @throws AmplifrException
+     *
+     * @return array
      */
     public function deletePost($projectId, $postId)
     {
+        $arResult = $this->executeApiRequest(
+            sprintf('/projects/%d/posts/%d/', $projectId, $postId), 'DELETE');
+        return $arResult['result'];
     }
 
     /**
