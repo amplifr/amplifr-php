@@ -388,7 +388,7 @@ class Amplifr implements AmplifrInterface
      *
      * @throws AmplifrException
      *
-     * @return PostInterface
+     * @return \SplObjectStorage
      *
      * @todo fix bug https://github.com/amplifr/amplifr-php/issues/4
      */
@@ -396,7 +396,10 @@ class Amplifr implements AmplifrInterface
     {
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/posts/%d/', $projectId, $postId), 'GET');
-        return new Post($arResult['result']);
+        $obResult = new \SplObjectStorage();
+        $obResult->attach(new Post($arResult['result']['post']));
+        $obResult->rewind();
+        return $obResult;
     }
 
     /**
