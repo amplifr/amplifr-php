@@ -26,14 +26,50 @@ amplifr-php is licensed under the MIT License - see the `MIT-LICENSE.txt` file f
 
 ## Examples
 
-### Basic Usage
-
+### Get access token for client
 ```php
 <?php
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
 
+use Amplifr\Amplifr;
+
+$log = new Logger('amplifr');
+$log->pushHandler(new StreamHandler('debug.log', Logger::DEBUG));
+
+//set application meta  
+$clientId = 'AAAAAA';
+$clientSecret = 'BBBBBB';
+$redirectUri = 'CCCCCC';
+
+$obAmplifr = new Amplifr($log);
+
+$clientGrantUrl = $obAmplifr->getClientAccessGrantUrl($clientId, $redirectUri);
+printf('client grant URL: %s' . PHP_EOL, $clientGrantUrl);
+
+// grab access grant from user input
+$accessGrant = 'DDDDDD';
+
+$arAccessToken = $obAmplifr->getClientAccessToken($accessGrant, $clientId, $clientSecret, $redirectUri);
+printf('access token: %s' . PHP_EOL, $arAccessToken['access_token']);
 ?>
 ```
 
+### Basic client initialization
+```php
+<?php
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
+
+use Amplifr\Amplifr;
+
+$log = new Logger('amplifr');
+$log->pushHandler(new StreamHandler('debug.log', Logger::DEBUG));
+
+$obAmplifr = new Amplifr($log);
+$obAmplifr->setAccessToken('XXXXXX');
+?>
+```
 ### Delete post
 ```php
 <?php
