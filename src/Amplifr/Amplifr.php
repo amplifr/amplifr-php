@@ -19,11 +19,9 @@ use Amplifr\Accounts\Account;
 use Amplifr\Attachments\Image;
 use Amplifr\Attachments\AttachmentInterface;
 use Amplifr\Posts\Post;
-use Amplifr\Posts\PostInterface;
 use Amplifr\Projects\Project;
 use Amplifr\Users\User;
 use Amplifr\Posts\DraftInterface;
-use Amplifr\Posts\Draft;
 
 use Amplifr\Stat\StatPublication;
 use Amplifr\Stat\StatReport;
@@ -44,19 +42,19 @@ class Amplifr implements AmplifrInterface
     const API_ENDPOINT = 'https://amplifr.com/api/v1';
 
     /**
+     * @var string oauth endpoint
+     */
+    const OAUTH_ENDPOINT = 'https://amplifr.com/oauth';
+
+    /**
      * @var string SDK version
      */
-    const SDK_VERSION = '1.0.0';
+    const SDK_VERSION = '1.1.0';
 
     /**
      * @var string user agent
      */
     const API_USER_AGENT = 'amplifr-php';
-
-    /**
-     * @var string
-     */
-    private $applicationToken;
 
     /**
      * @var string
@@ -95,16 +93,119 @@ class Amplifr implements AmplifrInterface
     protected $rawResponse;
 
     /**
+     * get client access grant url
+     *
+     * @param $clientId string
+     * @param $redirectUri string
+     *
+     * @return string
+     *
+     * @throws ApiAmplifrException
+     */
+    public function getClientAccessGrantUrl($clientId, $redirectUri)
+    {
+        if ('' === (string)$clientId) {
+            $errorMessage = 'client id is empty';
+            $this->log->error($errorMessage);
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        if ('' === (string)$redirectUri) {
+            $errorMessage = 'redirect uri is empty';
+            $this->log->error($errorMessage);
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        $clientAccessGrantUrl = sprintf('%s/authorize/?client_id=%s&response_type=code&redirect_uri=%s',
+            self::OAUTH_ENDPOINT, $clientId, $redirectUri);
+
+        $this->log->debug(sprintf('client access grant URL: %s', $clientAccessGrantUrl), array(
+            'client_id' => $clientId,
+            'redirect_uri' => $redirectUri,
+            'client_access_grant_url' => $clientAccessGrantUrl
+        ));
+
+        return $clientAccessGrantUrl;
+    }
+
+    /**
+     * get client access token
+     *
+     * @param $userAccessGrant string
+     * @param $clientId string
+     * @param $clientSecret string
+     * @param $defaultRedirectUri string
+     *
+     * @throws IoAmplifrException
+     * @throws AmplifrException
+     * @throws ApiAmplifrException
+     *
+     * @return array
+     */
+    public function getClientAccessToken($userAccessGrant, $clientId, $clientSecret, $defaultRedirectUri)
+    {
+        if ('' === (string)$userAccessGrant) {
+            $errorMessage = 'user access grant id is empty';
+            $this->log->error($errorMessage);
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        if ('' === (string)$clientId) {
+            $errorMessage = 'client id is empty';
+            $this->log->error($errorMessage);
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        if ('' === (string)$clientSecret) {
+            $errorMessage = 'client secret is empty';
+            $this->log->error($errorMessage);
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        if ('' === (string)$defaultRedirectUri) {
+            $errorMessage = 'default redirect uri is empty';
+            $this->log->error($errorMessage);
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        $url = sprintf('%s/token/?code=%s&client_id=%s&client_secret=%s&grant_type=authorization_code&redirect_uri=%s',
+            self::OAUTH_ENDPOINT, $userAccessGrant, $clientId, $clientSecret, $defaultRedirectUri);
+
+        $curlResult = $this->curlWrapper(
+            array(
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_CUSTOMREQUEST => 'POST',
+                CURLOPT_HTTPHEADER => array(
+                    'Cache-Control: no-cache',
+                    'X-ENVIRONMENT-PHP-VERSION: ' . phpversion()
+                ),
+                CURLOPT_URL => $url
+            )
+        );
+        $arResult = $this->decodeApiJsonResponse($curlResult);
+        // handle auth errors
+        if (array_key_exists('error', $arResult)) {
+            $errorMessage = sprintf('oauth error [%s] with message [%s]', $arResult['error'],
+                $arResult['error_description']);
+            $this->log->error($errorMessage, array(
+                'error' => $arResult['error'],
+                'error_description' => $arResult['error_description'],
+                'context' => $this->getContext()
+            ));
+            throw new ApiAmplifrException($errorMessage);
+        }
+        $this->log->debug(sprintf('access token: %s', $arResult['access_token']), $arResult);
+        return $arResult;
+    }
+
+    /**
      * Amplifr constructor.
-     * @param $applicationToken
-     * @param $accessToken
      * @param LoggerInterface|null $obLogger
      * @throws  AmplifrException
      */
-    public function __construct($applicationToken, $accessToken, LoggerInterface $obLogger = null)
+    public function __construct(LoggerInterface $obLogger = null)
     {
-        $this->setApplicationToken($applicationToken);
-        $this->setAccessToken($accessToken);
         $this->setDefaultCurlOptions(array(
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_RETURNTRANSFER => true,
@@ -118,8 +219,7 @@ class Amplifr implements AmplifrInterface
         } else {
             $this->log = new NullLogger();
         }
-        $this->log->debug('init Amplifr API wrapper',
-            array('application_token' => $this->applicationToken, 'access_token' => $this->accessToken));
+        $this->log->debug('init Amplifr API wrapper');
     }
 
     /**
@@ -132,7 +232,6 @@ class Amplifr implements AmplifrInterface
         return array(
             //user settings
             'access_token' => $this->getAccessToken(),
-            'application_token' => $this->getApplicationToken(),
             // API
             'curl_request_info' => $this->getRequestInfo(),
             'raw_request' => $this->getRawRequest(),
@@ -145,31 +244,15 @@ class Amplifr implements AmplifrInterface
     /**
      * @return string
      */
-    protected function getApplicationToken()
-    {
-        return $this->applicationToken;
-    }
-
-    /**
-     * @param $applicationToken
-     */
-    protected function setApplicationToken($applicationToken)
-    {
-        $this->applicationToken = (string)$applicationToken;
-    }
-
-    /**
-     * @return string
-     */
     protected function getAccessToken()
     {
-        return $this->accessToken;
+        return (string)$this->accessToken;
     }
 
     /**
      * @param $accessToken
      */
-    protected function setAccessToken($accessToken)
+    public function setAccessToken($accessToken)
     {
         $this->accessToken = (string)$accessToken;
     }
@@ -368,7 +451,7 @@ class Amplifr implements AmplifrInterface
             sprintf('/projects/%d/posts/?%s', $projectId, http_build_query(array(
                 'page' => $pageNumber,
                 'per_page' => $postsPerPage,
-//                'today' => false,
+//                'today' => 'true',
                 'order' => $order
             ))), 'GET');
         $obCollection = new \SplObjectStorage();
@@ -389,8 +472,6 @@ class Amplifr implements AmplifrInterface
      * @throws AmplifrException
      *
      * @return \SplObjectStorage
-     *
-     * @todo fix bug https://github.com/amplifr/amplifr-php/issues/4
      */
     public function getPost($projectId, $postId)
     {
@@ -657,6 +738,19 @@ class Amplifr implements AmplifrInterface
      */
     protected function executeApiRequest($url, $requestType, array $additionalPostParameters = array())
     {
+        if ('' === $this->getAccessToken()) {
+            $errorMessage = sprintf('access token is empty, set application token with method setAccessToken');
+            $this->log->error($errorMessage, $this->getContext());
+            throw new ApiAmplifrException($errorMessage);
+        }
+
+        // add auth token to url
+        if (parse_url($url, PHP_URL_QUERY) !== null) {
+            $url .= '&access_token=' . $this->getAccessToken();
+        } else {
+            $url .= '?access_token=' . $this->getAccessToken();
+        }
+
         $curlResult = $this->curlWrapper(
             array(
                 CURLOPT_CONNECTTIMEOUT => 5,
@@ -665,13 +759,12 @@ class Amplifr implements AmplifrInterface
                 CURLOPT_POSTFIELDS => http_build_query($additionalPostParameters),
                 CURLOPT_HTTPHEADER => array(
                     'Cache-Control: no-cache',
-                    'X-ACCESS-TOKEN: ' . $this->accessToken,
-                    'X-APP-TOKEN: ' . $this->applicationToken,
                     'X-ENVIRONMENT-PHP-VERSION: ' . phpversion()
                 ),
                 CURLOPT_URL => self::API_ENDPOINT . $url
             )
         );
+
         $this->handleNetworkErrors();
         $arResult = $this->decodeApiJsonResponse($curlResult);
         $this->handleApiErrors($arResult);
