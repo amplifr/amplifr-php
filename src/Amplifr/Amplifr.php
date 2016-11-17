@@ -595,7 +595,7 @@ class Amplifr implements AmplifrInterface
             throw new IoAmplifrException($errorMessage);
         }
 
-        $fileHandler = fopen($localFilename, 'r');
+        $fileHandler = fopen($localFilename, 'rb');
         if (false === $fileHandler) {
             $errorMessage = sprintf('open file error for [%s]', $localFilename);
             $this->log->error($errorMessage, array(
