@@ -93,6 +93,31 @@ class Amplifr implements AmplifrInterface
     protected $rawResponse;
 
     /**
+     * Amplifr constructor.
+     *
+     * @param LoggerInterface|null $obLogger
+     *
+     * @throws  AmplifrException
+     */
+    public function __construct(LoggerInterface $obLogger = null)
+    {
+        $this->setDefaultCurlOptions(array(
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLINFO_HEADER_OUT => true,
+            CURLOPT_VERBOSE => true,
+            CURLOPT_USERAGENT => strtolower(self::API_USER_AGENT . '-v' . self::SDK_VERSION),
+        ));
+
+        if ($obLogger !== null) {
+            $this->log = $obLogger;
+        } else {
+            $this->log = new NullLogger();
+        }
+        $this->log->debug('init Amplifr API wrapper');
+    }
+
+    /**
      * get client access grant url
      *
      * @param $clientId string
@@ -200,29 +225,6 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * Amplifr constructor.
-     * @param LoggerInterface|null $obLogger
-     * @throws  AmplifrException
-     */
-    public function __construct(LoggerInterface $obLogger = null)
-    {
-        $this->setDefaultCurlOptions(array(
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLINFO_HEADER_OUT => true,
-            CURLOPT_VERBOSE => true,
-            CURLOPT_USERAGENT => strtolower(self::API_USER_AGENT . '-v' . self::SDK_VERSION),
-        ));
-
-        if ($obLogger !== null) {
-            $this->log = $obLogger;
-        } else {
-            $this->log = new NullLogger();
-        }
-        $this->log->debug('init Amplifr API wrapper');
-    }
-
-    /**
      * get context
      *
      * @return array
@@ -242,6 +244,8 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
+     * get amplifr access token
+     *
      * @return string
      */
     protected function getAccessToken()
@@ -250,7 +254,11 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $accessToken
+     * set amplifr access token
+     *
+     * @param string $accessToken
+     *
+     * @return void
      */
     public function setAccessToken($accessToken)
     {
@@ -269,6 +277,8 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
+     * get raw response from amplifr API
+     *
      * @return string
      */
     public function getRawResponse()
@@ -287,7 +297,10 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @return \SplObjectStorage of Project
+     * get projects
+     *
+     * @return \SplObjectStorage of ProjectInterface
+     *
      * @throws AmplifrException
      */
     public function getProjects()
@@ -302,13 +315,60 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * get all accounts
-     * @param $projectId
+     * check project id and throw exception if invalid
+     *
+     * @param int $projectId
+     *
+     * @throws AmplifrException
+     *
+     * @return void
+     */
+    protected function checkProjectId($projectId)
+    {
+        if (!is_int($projectId)) {
+            $errorMessage = sprintf('projectId must be an integer, now we see type [%s] with value [%s]',
+                gettype($projectId), print_r($projectId, true));
+            $this->log->error($errorMessage, array(
+                'projectId' => print_r($projectId, true)
+            ));
+            throw new AmplifrException($errorMessage);
+        }
+    }
+
+    /**
+     * check account id and throw exception if invalid
+     *
+     * @param int $accountId
+     *
+     * @throws AmplifrException
+     *
+     * @return void
+     */
+    protected function checkAccountId($accountId)
+    {
+        if (!is_int($accountId)) {
+            $errorMessage = sprintf('accountId must be an integer, now we see type [%s] with value [%s]',
+                gettype($accountId), print_r($accountId, true));
+            $this->log->error($errorMessage, array(
+                'accountId' => print_r($accountId, true)
+            ));
+            throw new AmplifrException($errorMessage);
+        }
+    }
+
+    /**
+     * get amplifr accounts by project id
+     *
+     * @param int $projectId
+     *
      * @return \SplObjectStorage of Accounts
+     *
      * @throws AmplifrException
      */
     public function getAccounts($projectId)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/accounts', $projectId), 'GET', array());
         $obCollection = new \SplObjectStorage();
         foreach ($arResult['result']['accounts'] as $cnt => $arItemAccount) {
@@ -318,7 +378,8 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * get account by amplifr id
+     * get amplifr account by amplifr id
+     *
      * @param int $projectId
      * @param int $accountId
      * @return \SplObjectStorage of Accounts
@@ -326,6 +387,9 @@ class Amplifr implements AmplifrInterface
      */
     public function getAccountById($projectId, $accountId)
     {
+        $this->checkProjectId($projectId);
+        $this->checkAccountId($accountId);
+
         $allAccounts = $this->getAccounts($projectId);
         $obResult = new \SplObjectStorage();
         foreach ($allAccounts as $cnt => $itemAccount) {
@@ -340,12 +404,18 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
-     * @return \SplObjectStorage of Accounts
+     * get users
+     *
+     * @param int $projectId
+     *
+     * @return \SplObjectStorage of UserInterface
+     *
      * @throws AmplifrException
      */
     public function getUsers($projectId)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/users', $projectId), 'GET', array());
         $obCollection = new \SplObjectStorage();
         foreach ($arResult['result']['users'] as $cnt => $arItemAccount) {
@@ -355,14 +425,20 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
+     * get statistic report by period
+     *
+     * @param int $projectId
      * @param \DateTime $dateFrom
      * @param \DateTime $dateTo
+     *
      * @return StatReportInterface
+     *
      * @throws AmplifrException
      */
     public function getStatReport($projectId, \DateTime $dateFrom, \DateTime $dateTo)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/stats', $projectId), 'GET', array(
             'from' => $dateFrom->format('Y-m-d'),
             'to' => $dateTo->format('Y-m-d')
@@ -371,13 +447,19 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
-     * @param $amplifrPublicationId
+     * get statistic report by publication id
+     *
+     * @param int $projectId
+     * @param int $amplifrPublicationId
+     *
      * @return \SplObjectStorage
+     *
      * @throws AmplifrException
      */
     public function getStatByPublicationId($projectId, $amplifrPublicationId)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/stats/%d', $projectId, $amplifrPublicationId), 'GET',
             array());
 
@@ -397,13 +479,19 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * @param $projectId
-     * @param $publicationUrl
+     * get statistic report by URL
+     *
+     * @param int $projectId
+     * @param string $publicationUrl
+     *
      * @throws AmplifrException
-     * @return \SplObjectStorage
+     *
+     * @return  \SplObjectStorage
      */
     public function getStatByPublicationUrl($projectId, $publicationUrl)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/stats/by_link', $projectId), 'GET', array(
             'link' => $publicationUrl
         ));
@@ -447,6 +535,8 @@ class Amplifr implements AmplifrInterface
      */
     public function getPostList($projectId, $pageNumber = 1, $postsPerPage = 25, $order = 'DESC')
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/posts/?%s', $projectId, http_build_query(array(
                 'page' => $pageNumber,
@@ -475,6 +565,8 @@ class Amplifr implements AmplifrInterface
      */
     public function getPost($projectId, $postId)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/posts/%d/', $projectId, $postId), 'GET');
         $obResult = new \SplObjectStorage();
@@ -495,6 +587,8 @@ class Amplifr implements AmplifrInterface
      */
     public function deletePost($projectId, $postId)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/posts/%d/', $projectId, $postId), 'DELETE');
         return $arResult['result'];
@@ -502,43 +596,71 @@ class Amplifr implements AmplifrInterface
 
     /**
      * add new post to Amplifr
-     * @param $projectId
+     *
+     * @param int $projectId
      * @param DraftInterface $obNewPost
+     *
      * @throws AmplifrException
+     *
      * @return \SplObjectStorage
      */
     public function addNewPost($projectId, DraftInterface $obNewPost)
     {
+        $this->checkProjectId($projectId);
+
         $arData = $obNewPost->getData();
         $this->log->debug(sprintf('try to add new post'), array($arData));
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/posts', $projectId), 'POST', $arData);
+        $obPost = new Post($arResult['result']['post']);
+
+        $this->log->debug(sprintf('post successfully added to amplifr with id [%d]', $obPost->getId()), array(
+            'id' => $obPost->getId(),
+            'text' => $obPost->getText(),
+            'attachments' => $obPost->getAttachmentsId(),
+            'social_networks' => $obPost->getSocialNetworks(),
+        ));
+
         $obResult = new \SplObjectStorage();
-        $obResult->attach(new Post($arResult['result']['post']));
+        $obResult->attach($obPost);
         $obResult->rewind();
+
         return $obResult;
     }
 
     /**
+     * get image
+     *
      * @param int $projectId
      * @param int $imageId
+     *
      * @throws AmplifrException
+     *
      * @return AttachmentInterface
      */
     public function getImage($projectId, $imageId)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/images/%d', $projectId, $imageId), 'GET');
         return new Image($imageId, $arResult['result']['url']);
     }
 
     /**
+     * get video upload url
+     *
      * @param int $projectId
      * @param string $videoFileName
+     *
      * @return array
+     *
      * @throws AmplifrException
      */
     public function getVideoUploadUrl($projectId, $videoFileName)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/videos/get_upload_url?%s',
             $projectId, http_build_query(array(
                 'filename' => $videoFileName
@@ -548,13 +670,19 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
+     * get image upload url
+     *
      * @param $projectId int
      * @param $imageFileName string
+     *
      * @return array
+     *
      * @throws AmplifrException
      */
     public function getImageUploadUrl($projectId, $imageFileName)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/images/get_upload_url?%s',
             $projectId, http_build_query(array(
                 'filename' => $imageFileName
@@ -650,6 +778,8 @@ class Amplifr implements AmplifrInterface
      */
     public function uploadLocalVideo($projectId, $localFilename)
     {
+        $this->checkProjectId($projectId);
+
         // get image upload url in amplifr
         $arUploadFileInfo = $this->getVideoUploadUrl($projectId, basename($localFilename));
         $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
@@ -672,6 +802,8 @@ class Amplifr implements AmplifrInterface
      */
     public function uploadLocalImage($projectId, $localFilename)
     {
+        $this->checkProjectId($projectId);
+
         // get image upload url in amplifr
         $arUploadFileInfo = $this->getImageUploadUrl($projectId, basename($localFilename));
         $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
@@ -707,6 +839,8 @@ class Amplifr implements AmplifrInterface
      */
     public function uploadImageByUrl($projectId, $imageUrl)
     {
+        $this->checkProjectId($projectId);
+
         $arResult = $this->executeApiRequest(
             sprintf('/projects/%d/images/upload_from_url', $projectId), 'POST', array(
             'url' => $imageUrl
