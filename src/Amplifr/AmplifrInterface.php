@@ -12,7 +12,7 @@ namespace Amplifr;
 
 use Amplifr\Exceptions\AmplifrException;
 use Amplifr\Stat\StatReportInterface;
-use Amplifr\Stat\StatPublicationInterface;
+use Amplifr\Posts\DraftInterface;
 
 /**
  * Class Amplifr
@@ -30,7 +30,7 @@ interface AmplifrInterface
     public function getProjects();
 
     /**
-     * get accounts
+     * get amplifr accounts by project id
      *
      * @param $projectId
      *
@@ -70,7 +70,7 @@ interface AmplifrInterface
      * @param int $projectId
      * @param int $amplifrPublicationId
      *
-     * @return \SplObjectStorage
+     * @return \SplObjectStorage of StatPublication
      *
      * @throws AmplifrException
      */
@@ -84,7 +84,7 @@ interface AmplifrInterface
      *
      * @throws AmplifrException
      *
-     * @return  \SplObjectStorage
+     * @return  \SplObjectStorage of StatPublication
      */
     public function getStatByPublicationUrl($projectId, $publicationUrl);
 
@@ -99,4 +99,28 @@ interface AmplifrInterface
      * @return array
      */
     public function deletePost($projectId, $postId);
+
+    /**
+     * get information about post
+     *
+     * @param $projectId
+     * @param $postId
+     *
+     * @throws AmplifrException
+     *
+     * @return \SplObjectStorage of Post
+     */
+    public function getPost($projectId, $postId);
+
+    /**
+     * add new post to Amplifr
+     *
+     * @param int $projectId
+     * @param DraftInterface $obNewPost
+     *
+     * @throws AmplifrException
+     *
+     * @return \SplObjectStorage of Post
+     */
+    public function addNewPost($projectId, DraftInterface $obNewPost);
 }
