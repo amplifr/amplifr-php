@@ -1,4 +1,4 @@
-# amplifr-php
+# amplifr-php [![Build Status](https://travis-ci.org/amplifr/amplifr-php.svg?branch=master)](https://travis-ci.org/amplifr/amplifr-php)
 
 ## Installation
 Install the latest version with
