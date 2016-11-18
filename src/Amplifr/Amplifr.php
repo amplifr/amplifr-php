@@ -49,7 +49,7 @@ class Amplifr implements AmplifrInterface
     /**
      * @var string SDK version
      */
-    const SDK_VERSION = '1.1.0';
+    const SDK_VERSION = '1.2.0';
 
     /**
      * @var string user agent
@@ -682,22 +682,36 @@ class Amplifr implements AmplifrInterface
     public function getImageUploadUrl($projectId, $imageFileName)
     {
         $this->checkProjectId($projectId);
+        $this->log->debug(sprintf('try to get upload url with project [%d] for file [%s]', $projectId, $imageFileName), array(
+            'projectId' => $projectId,
+            'imageFileName' => $imageFileName
+        ));
 
         $arResult = $this->executeApiRequest(sprintf('/projects/%d/images/get_upload_url?%s',
             $projectId, http_build_query(array(
                 'filename' => $imageFileName
             ))), 'GET');
 
+        $this->log->debug('upload url for image', array($arResult));
+
         return $arResult['result'];
     }
 
     /**
-     * @param string $localFilename
-     * @param string $uploadUrl
+     * check local file and throw exception if is not a file or not readable
+     *
+     * @param $localFilename
+     *
      * @throws IoAmplifrException
+     *
+     * @return void
      */
-    protected function uploadFileToStorage($localFilename, $uploadUrl)
+    protected function checkLocalFile($localFilename)
     {
+        $this->log->debug(sprintf('try to check local file with path [%s]', $localFilename), array(
+            'localFilename' => $localFilename
+        ));
+
         if (!is_file($localFilename)) {
             $errorMessage = sprintf('resource [%s] is not a file', $localFilename);
             $this->log->error($errorMessage, array(
@@ -713,7 +727,16 @@ class Amplifr implements AmplifrInterface
             ));
             throw new IoAmplifrException($errorMessage);
         }
+        $this->log->debug(sprintf('local file [%s] exists and readable', $localFilename));
+    }
 
+    /**
+     * @param string $localFilename
+     * @param string $uploadUrl
+     * @throws IoAmplifrException
+     */
+    protected function uploadFileToStorage($localFilename, $uploadUrl)
+    {
         $fileSize = filesize($localFilename);
         if (false === $fileSize) {
             $errorMessage = sprintf('file size calculate error for file [%s] ', $localFilename);
@@ -767,27 +790,27 @@ class Amplifr implements AmplifrInterface
     }
 
     /**
-     * upload local video to amplifr backend
+     * get locale independent filename for storage
      *
-     * @param int $projectId
      * @param string $localFilename
      *
-     * @throws AmplifrException
+     * @throws IoAmplifrException
      *
-     * @return AttachmentInterface
+     * @return string
      */
-    public function uploadLocalVideo($projectId, $localFilename)
+    protected function getFilenameForStorage($localFilename)
     {
-        $this->checkProjectId($projectId);
-
-        // get image upload url in amplifr
-        $arUploadFileInfo = $this->getVideoUploadUrl($projectId, basename($localFilename));
-        $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
-
-        // upload file to S3 backend
-        $this->uploadFileToStorage($localFilename, $arUploadFileInfo['presignedUrl']);
-
-        return new Video($arUploadFileInfo['id'], $arUploadFileInfo['publicUrl']);
+        $fileExtension = pathinfo($localFilename, PATHINFO_EXTENSION);
+        if ('' === $fileExtension) {
+            $errorMessage = sprintf('unknown file extension for local file [%s]', $localFilename);
+            $this->log->error($errorMessage, array(
+                'localFilename' => $localFilename,
+            ));
+            throw new IoAmplifrException($errorMessage);
+        }
+        $filenameForStorage = md5($localFilename . mt_rand()) . '.' . $fileExtension;
+        $this->log->debug(sprintf('filename for storage [%s]', $filenameForStorage));
+        return $filenameForStorage;
     }
 
     /**
@@ -803,13 +826,15 @@ class Amplifr implements AmplifrInterface
     public function uploadLocalImage($projectId, $localFilename)
     {
         $this->checkProjectId($projectId);
+        $this->checkLocalFile($localFilename);
 
-        // get image upload url in amplifr
-        $arUploadFileInfo = $this->getImageUploadUrl($projectId, basename($localFilename));
+        // get presigned image upload url to amplifr
+        $arUploadFileInfo = $this->getImageUploadUrl($projectId, $this->getFilenameForStorage($localFilename));
         $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
 
         // upload file to S3 backend
         $this->uploadFileToStorage($localFilename, $arUploadFileInfo['presignedUrl']);
+        $this->log->debug('file upload to amplifr storage complete');
 
         // confirm success file upload to backend
         $arResult = $this->executeApiRequest(
@@ -823,8 +848,49 @@ class Amplifr implements AmplifrInterface
             ));
             throw new ApiAmplifrException($errorMessage);
         }
+        $obFile = new Image($arUploadFileInfo['id'], $arUploadFileInfo['publicUrl']);
 
-        return new Image($arUploadFileInfo['id'], $arUploadFileInfo['publicUrl']);
+        $this->log->debug(sprintf('file type [%s] with id [%s] successfully uploaded and registered, view url [%s]',
+            $obFile->getType(), $obFile->getId(), $obFile->getUrl()), array(
+            'image_id' => $obFile->getId(),
+            'image_url' => $obFile->getUrl()
+        ));
+
+        return $obFile;
+    }
+
+    /**
+     * upload local video to amplifr backend
+     *
+     * @param int $projectId
+     * @param string $localFilename
+     *
+     * @throws AmplifrException
+     *
+     * @return AttachmentInterface
+     */
+    public function uploadLocalVideo($projectId, $localFilename)
+    {
+        $this->checkProjectId($projectId);
+        $this->checkLocalFile($localFilename);
+
+        // get image upload url in amplifr
+        $arUploadFileInfo = $this->getVideoUploadUrl($projectId, $this->getFilenameForStorage($localFilename));
+        $this->log->debug('upload file info from Amplifr', array($arUploadFileInfo));
+
+        // upload file to S3 backend
+        $this->uploadFileToStorage($localFilename, $arUploadFileInfo['presignedUrl']);
+        $this->log->debug('file upload to amplifr storage complete');
+
+        $obFile = new Video($arUploadFileInfo['id'], $arUploadFileInfo['publicUrl']);
+
+        $this->log->debug(sprintf('file type [%s] with id [%s] successfully uploaded and registered, view url [%s]',
+            $obFile->getType(), $obFile->getId(), $obFile->getUrl()), array(
+            'image_id' => $obFile->getId(),
+            'image_url' => $obFile->getUrl()
+        ));
+
+        return $obFile;
     }
 
     /**
