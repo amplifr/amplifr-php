@@ -734,6 +734,7 @@ class Amplifr implements AmplifrInterface
      * @param string $localFilename
      * @param string $uploadUrl
      * @throws IoAmplifrException
+     * @throws AmplifrException
      */
     protected function uploadFileToStorage($localFilename, $uploadUrl)
     {
@@ -1068,10 +1069,17 @@ class Amplifr implements AmplifrInterface
      * cURL wrapper
      * @param $arCurlOptions array
      * @throws IoAmplifrException
+     * @throws AmplifrException
      * @return mixed
      */
     protected function curlWrapper(array $arCurlOptions = array())
     {
+        if (!extension_loaded('curl')) {
+            $errorMessage = 'cURL extension must be installed to use this library';
+            $this->log->error($errorMessage);
+            throw new AmplifrException($errorMessage);
+        }
+
         // build default cURL options array
         $curlOptions = array_replace($this->getDefaultCurlOptions(), $arCurlOptions);
 
